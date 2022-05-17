@@ -1,0 +1,117 @@
+
+-- Check data that we will be starting with
+
+SELECT Location, date, total_cases, new_cases, total_deaths, population
+FROM `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+WHERE continent is not null 
+ORDER BY 1,2
+
+
+-- Total Cases vs Total Deaths
+-- A rought likelihood of dying if you contract covid
+
+SELECT Location, date, total_cases,total_deaths, ( total_deaths / total_cases )*100 as DeathPercentage
+FROM `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+WHERE Location like '%Brazil%'
+and continent is not null 
+ORDER BY 1,2
+
+
+-- Total Cases vs Population
+-- Population percentage that has been infected with Covid
+
+SELECT Location, date, Population, total_cases,  (total_cases/population)*100 as PercentPopulationInfected
+FROM `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+ORDER BY 1,2
+
+
+-- Countries with the highest infection rate compared to the population
+
+SELECT Location, Population, MAX(total_cases) as HighestInfectionCount,  Max((total_cases/population))*100 as PercentPopulationInfected
+FROM `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+Group by Location, Population
+ORDER BY PercentPopulationInfected DESC
+
+
+-- Countries with the highest death count compared to the population
+
+SELECT Location, MAX(Total_deaths) as TotalDeathCount
+FROM `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+WHERE continent is not null 
+Group by Location
+ORDER BY TotalDeathCount desc
+
+
+
+-- CONTINENT BREAKS 
+
+-- Continents with the death count per population
+
+SELECT Location, MAX(Total_deaths) as TotalDeathCount
+FROM `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+WHERE (continent is null and Location != "Upper middle income" and Location != "High income" and Location != "Lower middle income" and Location != "Low income")
+Group by Location
+ORDER BY TotalDeathCount desc
+
+
+-- Death Percentage
+Select MAX(total_cases) as world_total_cases, MAX(total_deaths) as world_total_deaths, MAX(total_deaths)/MAX(total_cases)*100 as DeathPercentage
+From `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+order by 3
+
+-- Creating table with join to understand vaccination rates
+
+Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
+	sum(vac.new_vaccinations) over (partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated 
+From `zippy-tiger-328215.portfolio_covid_project.coviddeaths` dea
+Join `zippy-tiger-328215.portfolio_covid_project.covidvaccinations` vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+where dea.continent is not null
+
+
+-- Vaccinations Percentage (At least one vaccination) (By creating a CTE)
+
+With PopvsVac AS 
+ (
+ Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
+ 	sum(vac.new_vaccinations) over (partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated 
+ From `zippy-tiger-328215.portfolio_covid_project.coviddeaths` dea
+ Join `zippy-tiger-328215.portfolio_covid_project.covidvaccinations` vac
+ 	On dea.location = vac.location
+	and dea.date = vac.date
+ where dea.continent is not null
+
+ )
+select *, (RollingPeopleVaccinated / population)*100
+from PopvsVac
+
+-- Vaccinations Percentage (At least one vaccination) (By creating a temp table)
+
+
+DROP Table if exists `zippy-tiger-328215.portfolio_covid_project.PercentPopulationVaccinated`
+Create Table `zippy-tiger-328215.portfolio_covid_project.PercentPopulationVaccinated` AS
+ Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
+	sum(vac.new_vaccinations) over (partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated 
+ From `zippy-tiger-328215.portfolio_covid_project.coviddeaths` dea
+ Join `zippy-tiger-328215.portfolio_covid_project.covidvaccinations` vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+ where dea.continent is not null
+
+select *, (RollingPeopleVaccinated / population)*100
+from `zippy-tiger-328215.portfolio_covid_project.PercentPopulationVaccinated`
+
+
+
+-- Vaccinations Percentage (At least one vaccination) (By creating a temp table)
+
+-- Contintents with the death count per population
+
+create view `zippy-tiger-328215.portfolio_covid_project.continent_break` AS
+ SELECT Location, MAX(Total_deaths) as TotalDeathCount
+ FROM `zippy-tiger-328215.portfolio_covid_project.coviddeaths`
+ WHERE (continent is null and Location != "Upper middle income" and Location != "High income" and Location != "Lower middle income" and Location != "Low income")
+ Group by Location
+ ORDER BY TotalDeathCount desc
+
